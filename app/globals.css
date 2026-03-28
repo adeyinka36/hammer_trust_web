@@ -1,21 +1,28 @@
 @import "tailwindcss";
 
+/* Align with hammer_trust_app tailwind (logo / primary) */
 :root {
-  --background: #ffffff;
-  --foreground: #171717;
+  --background: #f5f8fc;
+  --foreground: #0d0f1a;
 }
 
 @theme inline {
   --color-background: var(--background);
   --color-foreground: var(--foreground);
+  /* primary.DEFAULT / primary-600 from hammer_trust_app */
+  --color-brand: #1b3a6b;
+  --color-brand-hover: #183460;
+  --color-navy-darkest: #0d0f1a;
+  --color-surface-tint: #e8eef6;
+  --color-border-soft: #c5d4e9;
   --font-sans: var(--font-geist-sans);
   --font-mono: var(--font-geist-mono);
 }
 
 @media (prefers-color-scheme: dark) {
   :root {
-    --background: #0a0a0a;
-    --foreground: #ededed;
+    --background: #0d0f1a;
+    --foreground: #f5f8fc;
   }
 }
 
