@@ -137,7 +137,7 @@ export default function UploaderUserSearch() {
               className="w-full text-left rounded-xl border border-emerald-200/90 bg-emerald-50/90 px-4 py-4 sm:px-5 sm:py-4 shadow-sm transition-all duration-200 hover:border-brand/40 hover:bg-white hover:shadow-md focus:outline-none focus-visible:ring-2 focus-visible:ring-brand/30"
             >
               <p className="text-xs font-semibold uppercase tracking-wide text-emerald-900/80">
-                Match found — tap to open
+                Match found. Tap to open
               </p>
               <p className="mt-1 text-lg font-bold text-foreground">
                 {matchedUser.name?.trim() || matchedUser.email}

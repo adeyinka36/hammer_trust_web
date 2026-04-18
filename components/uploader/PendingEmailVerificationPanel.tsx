@@ -76,7 +76,7 @@ export default function PendingEmailVerificationPanel({
     <div className="max-w-md w-full bg-white rounded-2xl border border-border-soft shadow-sm p-8 text-center">
       <h1 className="text-xl font-bold text-foreground mb-2">Check your email</h1>
       {welcomeSubtitle ? (
-        <p className="text-sm text-slate-600 mb-4">You&apos;re almost set — one more step.</p>
+        <p className="text-sm text-slate-600 mb-4">You&apos;re almost set. One more step.</p>
       ) : null}
 
       <p className="text-sm text-slate-600 leading-relaxed mb-2">
@@ -119,7 +119,7 @@ export default function PendingEmailVerificationPanel({
             disabled={checkingVerified}
             className="w-full rounded-xl py-3 font-bold text-white bg-brand hover:bg-brand-hover disabled:opacity-50 transition-colors"
           >
-            {checkingVerified ? 'Checking…' : "I've verified — continue"}
+            {checkingVerified ? 'Checking…' : "I've verified. Continue"}
           </button>
           <button
             type="button"

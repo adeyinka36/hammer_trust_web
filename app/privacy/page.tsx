@@ -54,7 +54,7 @@ export default function PrivacyPage() {
               <div className="flex items-center gap-2 mb-3">
                 <Building2 className="text-brand w-5 h-5" />
                 <h2 className="text-lg font-semibold text-foreground">
-                  Uploader portal — what we collect
+                  Uploader portal. What we collect
                 </h2>
               </div>
               <p className="text-sm leading-6 text-slate-700">
