@@ -1,6 +1,6 @@
 'use client';
 
-import React from 'react';
+import React, { useMemo, useState } from 'react';
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import {
@@ -12,10 +12,77 @@ import {
   Lock,
   Cookie,
   Mail,
+  Trash2,
+  AlertTriangle,
+  Loader2,
+  X,
 } from 'lucide-react';
+import { createApiClient } from '@/lib/api/client';
+import { deleteAccountByCredentials } from '@/lib/api/privacy';
+import { getErrorMessage, getFieldErrors } from '@/lib/api/errors';
 
 export default function PrivacyPage() {
   const router = useRouter();
+  const apiClient = useMemo(() => createApiClient(() => null), []);
+  const [deleteModalOpen, setDeleteModalOpen] = useState(false);
+  const [email, setEmail] = useState('');
+  const [password, setPassword] = useState('');
+  const [confirmationText, setConfirmationText] = useState('');
+  const [fieldErrors, setFieldErrors] = useState<Record<string, string>>({});
+  const [submitMessage, setSubmitMessage] = useState<string | null>(null);
+  const [submitError, setSubmitError] = useState<string | null>(null);
+  const [isSubmitting, setIsSubmitting] = useState(false);
+
+  const resetDeleteForm = () => {
+    setEmail('');
+    setPassword('');
+    setConfirmationText('');
+    setFieldErrors({});
+    setSubmitMessage(null);
+    setSubmitError(null);
+    setIsSubmitting(false);
+  };
+
+  const closeDeleteModal = () => {
+    if (isSubmitting) return;
+    setDeleteModalOpen(false);
+    resetDeleteForm();
+  };
+
+  const openDeleteModal = () => {
+    resetDeleteForm();
+    setDeleteModalOpen(true);
+  };
+
+  const handleDeleteRequest = async () => {
+    setFieldErrors({});
+    setSubmitMessage(null);
+    setSubmitError(null);
+    setIsSubmitting(true);
+    try {
+      const response = await deleteAccountByCredentials(apiClient, {
+        email,
+        password,
+        confirmation_text: confirmationText,
+      });
+      setSubmitMessage(response.message);
+    } catch (error: unknown) {
+      const nextFieldErrors = getFieldErrors(error);
+      if (Object.keys(nextFieldErrors).length > 0) {
+        setFieldErrors(nextFieldErrors);
+      } else {
+        setSubmitError(getErrorMessage(error, 'Unable to process deletion request right now.'));
+      }
+    } finally {
+      setIsSubmitting(false);
+    }
+  };
+
+  const canSubmitDelete =
+    !isSubmitting &&
+    email.trim().length > 0 &&
+    password.length > 0 &&
+    confirmationText.trim().length > 0;
 
   return (
     <div className="min-h-screen bg-background px-4 py-10">
@@ -81,6 +148,25 @@ export default function PrivacyPage() {
                 documents and for how long. Do not upload content you are not entitled to share or
                 that violates applicable law.
               </p>
+            </section>
+
+            <section className="rounded-xl border border-red-200 bg-red-50/60 p-6">
+              <div className="flex items-center gap-2 mb-3">
+                <Trash2 className="text-red-600 w-5 h-5" />
+                <h2 className="text-lg font-semibold text-foreground">Delete user details</h2>
+              </div>
+              <p className="text-sm leading-6 text-slate-700 mb-4">
+                If you want to permanently delete all details for an account, confirm ownership with email,
+                password, and the confirmation phrase. This action cannot be undone.
+              </p>
+              <button
+                type="button"
+                onClick={openDeleteModal}
+                className="inline-flex items-center gap-2 rounded-lg bg-red-600 px-4 py-2.5 text-sm font-semibold text-white hover:bg-red-700 transition-colors"
+              >
+                <Trash2 className="w-4 h-4" />
+                Delete user details
+              </button>
             </section>
 
             <section className="rounded-xl border border-border-soft bg-surface-tint p-6">
@@ -166,6 +252,109 @@ export default function PrivacyPage() {
           </div>
         </div>
       </div>
+
+      {deleteModalOpen ? (
+        <div className="fixed inset-0 z-50 bg-black/45 px-4 py-8 flex items-center justify-center">
+          <div className="w-full max-w-lg rounded-2xl border border-border-soft bg-white shadow-xl">
+            <div className="flex items-start justify-between gap-3 border-b border-border-soft px-6 py-5">
+              <div className="flex items-start gap-3">
+                <div className="mt-0.5 rounded-xl bg-red-100 p-2">
+                  <AlertTriangle className="w-5 h-5 text-red-600" />
+                </div>
+                <div>
+                  <h3 className="text-lg font-semibold text-foreground">Delete account details</h3>
+                  <p className="mt-1 text-sm text-slate-600 leading-5">
+                    Confirm credentials and type the phrase exactly:
+                    <span className="font-semibold text-foreground"> delete my information</span>
+                  </p>
+                </div>
+              </div>
+              <button
+                type="button"
+                onClick={closeDeleteModal}
+                className="rounded-full p-1 text-slate-500 hover:text-slate-700"
+                aria-label="Close deletion dialog"
+              >
+                <X className="w-5 h-5" />
+              </button>
+            </div>
+
+            <div className="px-6 py-5 space-y-4">
+              <div>
+                <label htmlFor="delete-email" className="block text-xs font-semibold uppercase tracking-wide text-slate-600 mb-1.5">
+                  Email
+                </label>
+                <input
+                  id="delete-email"
+                  type="email"
+                  value={email}
+                  onChange={(e) => setEmail(e.target.value)}
+                  className="w-full rounded-lg border border-border-soft px-3 py-2.5 text-sm text-foreground outline-none focus:border-brand"
+                  placeholder="you@example.com"
+                  autoComplete="email"
+                />
+                {fieldErrors.email ? <p className="mt-1 text-xs text-red-600">{fieldErrors.email}</p> : null}
+              </div>
+
+              <div>
+                <label htmlFor="delete-password" className="block text-xs font-semibold uppercase tracking-wide text-slate-600 mb-1.5">
+                  Password
+                </label>
+                <input
+                  id="delete-password"
+                  type="password"
+                  value={password}
+                  onChange={(e) => setPassword(e.target.value)}
+                  className="w-full rounded-lg border border-border-soft px-3 py-2.5 text-sm text-foreground outline-none focus:border-brand"
+                  placeholder="Your password"
+                  autoComplete="current-password"
+                />
+                {fieldErrors.password ? <p className="mt-1 text-xs text-red-600">{fieldErrors.password}</p> : null}
+              </div>
+
+              <div>
+                <label htmlFor="delete-confirmation-text" className="block text-xs font-semibold uppercase tracking-wide text-slate-600 mb-1.5">
+                  Confirmation phrase
+                </label>
+                <input
+                  id="delete-confirmation-text"
+                  type="text"
+                  value={confirmationText}
+                  onChange={(e) => setConfirmationText(e.target.value)}
+                  className="w-full rounded-lg border border-border-soft px-3 py-2.5 text-sm text-foreground outline-none focus:border-brand"
+                  placeholder="delete my information"
+                />
+                {fieldErrors.confirmation_text ? (
+                  <p className="mt-1 text-xs text-red-600">{fieldErrors.confirmation_text}</p>
+                ) : null}
+              </div>
+
+              {submitError ? <p className="text-sm text-red-600">{submitError}</p> : null}
+              {submitMessage ? <p className="text-sm text-emerald-700">{submitMessage}</p> : null}
+            </div>
+
+            <div className="flex items-center justify-end gap-3 border-t border-border-soft px-6 py-4">
+              <button
+                type="button"
+                onClick={closeDeleteModal}
+                disabled={isSubmitting}
+                className="rounded-lg border border-border-soft px-4 py-2 text-sm font-semibold text-slate-700 hover:bg-slate-50 disabled:opacity-60"
+              >
+                Cancel
+              </button>
+              <button
+                type="button"
+                onClick={() => void handleDeleteRequest()}
+                disabled={!canSubmitDelete}
+                className="inline-flex items-center gap-2 rounded-lg bg-red-600 px-4 py-2 text-sm font-semibold text-white hover:bg-red-700 disabled:opacity-60"
+              >
+                {isSubmitting ? <Loader2 className="w-4 h-4 animate-spin" /> : <Trash2 className="w-4 h-4" />}
+                Delete
+              </button>
+            </div>
+          </div>
+        </div>
+      ) : null}
     </div>
   );
 }
