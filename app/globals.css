@@ -4,6 +4,7 @@
 :root {
   --background: #f5f8fc;
   --foreground: #0d0f1a;
+  color-scheme: light;
 }
 
 @theme inline {
@@ -17,13 +18,6 @@
   --color-border-soft: #c5d4e9;
   --font-sans: var(--font-geist-sans);
   --font-mono: var(--font-geist-mono);
-}
-
-@media (prefers-color-scheme: dark) {
-  :root {
-    --background: #0d0f1a;
-    --foreground: #f5f8fc;
-  }
 }
 
 body {

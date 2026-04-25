@@ -24,7 +24,7 @@ export default function AuthInput({
         {...props}
         className={[
           'w-full px-4 py-3 rounded-xl border outline-none transition-colors',
-          'bg-surface-tint border-border-soft text-foreground',
+          'bg-surface-tint border-border-soft text-navy-darkest caret-brand',
           'placeholder:text-[#7B8AA8]',
           'focus:ring-2 focus:ring-brand/25 focus:border-brand',
           error ? 'border-red-400 focus:ring-red-400/20' : '',
