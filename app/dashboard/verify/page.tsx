@@ -13,6 +13,8 @@ export default function VerifyPage() {
   const canvasRef = useRef<HTMLCanvasElement | null>(null);
   const codeInputRef = useRef<HTMLInputElement | null>(null);
   const streamRef = useRef<MediaStream | null>(null);
+  const startCameraRequestRef = useRef(0);
+  const previewUrlRef = useRef<string | null>(null);
   const [cameraReady, setCameraReady] = useState(false);
   const [startingCamera, setStartingCamera] = useState(false);
   const [capturedFile, setCapturedFile] = useState<File | null>(null);
@@ -40,25 +42,41 @@ export default function VerifyPage() {
   }, []);
 
   const startCamera = useCallback(async () => {
+    const requestId = startCameraRequestRef.current + 1;
+    startCameraRequestRef.current = requestId;
     setStartingCamera(true);
     setError(null);
     try {
+      stopCamera();
       const stream = await navigator.mediaDevices.getUserMedia({
         video: { facingMode: 'environment' },
         audio: false,
       });
+      if (startCameraRequestRef.current !== requestId) {
+        stream.getTracks().forEach((track) => track.stop());
+        return;
+      }
       streamRef.current = stream;
       if (videoRef.current) {
         videoRef.current.srcObject = stream;
-        await videoRef.current.play();
+        try {
+          await videoRef.current.play();
+        } catch (playErr: unknown) {
+          const message = playErr instanceof Error ? playErr.message : String(playErr);
+          if (!message.includes('interrupted by a new load request')) {
+            throw playErr;
+          }
+        }
       }
       setCameraReady(true);
     } catch (err: unknown) {
       setError(getErrorMessage(err, 'Unable to access camera.'));
     } finally {
-      setStartingCamera(false);
+      if (startCameraRequestRef.current === requestId) {
+        setStartingCamera(false);
+      }
     }
-  }, []);
+  }, [stopCamera]);
 
   const capture = useCallback(async () => {
     if (!videoRef.current || !canvasRef.current) return;
@@ -82,6 +100,7 @@ export default function VerifyPage() {
     const nextUrl = URL.createObjectURL(file);
     setPreviewUrl((current) => {
       if (current) URL.revokeObjectURL(current);
+      previewUrlRef.current = nextUrl;
       return nextUrl;
     });
     stopCamera();
@@ -93,22 +112,25 @@ export default function VerifyPage() {
     setError(null);
     if (previewUrl) {
       URL.revokeObjectURL(previewUrl);
+      previewUrlRef.current = null;
       setPreviewUrl(null);
     }
     void startCamera();
   }, [previewUrl, startCamera]);
 
   const clearAll = useCallback(() => {
+    stopCamera();
     setCode('');
     setMatch(null);
     setError(null);
     setCapturedFile(null);
     if (previewUrl) {
       URL.revokeObjectURL(previewUrl);
+      previewUrlRef.current = null;
       setPreviewUrl(null);
     }
     void startCamera();
-  }, [previewUrl, startCamera]);
+  }, [previewUrl, startCamera, stopCamera]);
 
   const submit = useCallback(async () => {
     if (!capturedFile) return;
@@ -133,9 +155,12 @@ export default function VerifyPage() {
     void startCamera();
     return () => {
       stopCamera();
-      if (previewUrl) URL.revokeObjectURL(previewUrl);
+      if (previewUrlRef.current) {
+        URL.revokeObjectURL(previewUrlRef.current);
+        previewUrlRef.current = null;
+      }
     };
-  }, [startCamera, stopCamera, previewUrl]);
+  }, [startCamera, stopCamera]);
 
   const codeDigits = Array.from({ length: CODE_LENGTH }, (_, index) => code[index] ?? '');
 
