@@ -1,7 +1,7 @@
 'use client';
 
 import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
-import { Camera } from 'lucide-react';
+import { Camera, Loader2 } from 'lucide-react';
 import { useUploaderAuth } from '@/context/UploaderAuthContext';
 import { verifyFaceByCode, type VerifyFaceMatch } from '@/lib/api/face-verify';
 import { getErrorMessage } from '@/lib/api/errors';
@@ -181,12 +181,26 @@ export default function VerifyPage() {
           type="button"
           onClick={() => void submit()}
           disabled={!canSubmit}
-          className="rounded-xl bg-navy-dark px-4 py-2.5 text-white font-semibold disabled:opacity-50"
+          className="w-full sm:w-auto inline-flex items-center justify-center gap-2 rounded-xl bg-brand px-6 py-3 text-white font-semibold shadow-md hover:bg-brand-hover transition-colors disabled:opacity-50 disabled:hover:bg-brand"
         >
-          {submitting ? 'Verifying…' : 'Verify'}
+          {submitting ? (
+            <>
+              <Loader2 size={18} className="animate-spin" />
+              Verifying identity…
+            </>
+          ) : (
+            'Verify'
+          )}
         </button>
 
         {error ? <p className="text-sm text-red-600 font-medium">{error}</p> : null}
+        {submitting ? (
+          <div className="rounded-xl border border-brand/20 bg-brand/5 px-4 py-3">
+            <p className="text-sm text-brand font-medium">
+              Matching face and code securely. This usually takes a few seconds.
+            </p>
+          </div>
+        ) : null}
         {match ? (
           <div className="rounded-xl border border-emerald-200 bg-emerald-50 px-4 py-3">
             <p className="text-sm font-semibold text-emerald-900">Matched email: {match.email}</p>
