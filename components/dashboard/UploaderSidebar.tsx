@@ -4,7 +4,7 @@ import React from 'react';
 import Image from 'next/image';
 import Link from 'next/link';
 import { usePathname } from 'next/navigation';
-import { LayoutDashboard, Settings, X } from 'lucide-react';
+import { LayoutDashboard, ScanFace, Settings, X } from 'lucide-react';
 
 interface UploaderSidebarProps {
   readonly onClose?: () => void;
@@ -19,6 +19,7 @@ export default function UploaderSidebar({
 
   const items = [
     { id: 'dash', label: 'Dashboard', href: '/dashboard', icon: LayoutDashboard },
+    { id: 'verify', label: 'Verify', href: '/dashboard/verify', icon: ScanFace },
     { id: 'settings', label: 'Settings', href: '/dashboard/settings', icon: Settings },
   ] as const;
 
