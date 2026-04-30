@@ -97,6 +97,18 @@ export default function VerifyPage() {
     void startCamera();
   }, [previewUrl, startCamera]);
 
+  const clearAll = useCallback(() => {
+    setCode('');
+    setMatch(null);
+    setError(null);
+    setCapturedFile(null);
+    if (previewUrl) {
+      URL.revokeObjectURL(previewUrl);
+      setPreviewUrl(null);
+    }
+    void startCamera();
+  }, [previewUrl, startCamera]);
+
   const submit = useCallback(async () => {
     if (!capturedFile) return;
     setSubmitting(true);
@@ -181,7 +193,7 @@ export default function VerifyPage() {
           type="button"
           onClick={() => void submit()}
           disabled={!canSubmit}
-          className="w-full sm:w-auto inline-flex items-center justify-center gap-2 rounded-xl bg-brand px-6 py-3 text-white font-semibold shadow-md hover:bg-brand-hover transition-colors disabled:opacity-50 disabled:hover:bg-brand"
+          className="w-full inline-flex items-center justify-center gap-2 rounded-2xl bg-brand px-8 py-4 text-base sm:text-lg text-white font-bold shadow-md hover:bg-brand-hover transition-colors disabled:opacity-50 disabled:hover:bg-brand"
         >
           {submitting ? (
             <>
@@ -191,6 +203,14 @@ export default function VerifyPage() {
           ) : (
             'Verify'
           )}
+        </button>
+        <button
+          type="button"
+          onClick={clearAll}
+          disabled={submitting}
+          className="w-full inline-flex items-center justify-center rounded-2xl border border-border-soft bg-white px-6 py-3 text-sm sm:text-base font-semibold text-slate-700 hover:text-brand hover:border-brand/40 transition-colors disabled:opacity-60"
+        >
+          Clear all
         </button>
 
         {error ? <p className="text-sm text-red-600 font-medium">{error}</p> : null}
@@ -202,8 +222,10 @@ export default function VerifyPage() {
           </div>
         ) : null}
         {match ? (
-          <div className="rounded-xl border border-emerald-200 bg-emerald-50 px-4 py-3">
-            <p className="text-sm font-semibold text-emerald-900">Matched email: {match.email}</p>
+          <div className="rounded-xl border border-emerald-200 bg-emerald-50 px-4 py-4">
+            <p className="text-base sm:text-lg font-bold text-emerald-900">
+              Matched email: {match.email}
+            </p>
             {match.similarity != null ? (
               <p className="text-xs text-emerald-800 mt-1">Similarity: {Math.round(match.similarity)}%</p>
             ) : null}
