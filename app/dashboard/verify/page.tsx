@@ -11,6 +11,7 @@ const CODE_LENGTH = 6;
 export default function VerifyPage() {
   const videoRef = useRef<HTMLVideoElement | null>(null);
   const canvasRef = useRef<HTMLCanvasElement | null>(null);
+  const codeInputRef = useRef<HTMLInputElement | null>(null);
   const streamRef = useRef<MediaStream | null>(null);
   const [cameraReady, setCameraReady] = useState(false);
   const [startingCamera, setStartingCamera] = useState(false);
@@ -136,16 +137,19 @@ export default function VerifyPage() {
     };
   }, [startCamera, stopCamera, previewUrl]);
 
-  return (
-    <div className="space-y-6">
-      <header className="space-y-1">
-        <h1 className="text-2xl font-semibold text-foreground">Verify</h1>
-        <p className="text-sm text-slate-600">
-          Capture face, enter 6-digit code, and reveal the matched account email.
-        </p>
-      </header>
+  const codeDigits = Array.from({ length: CODE_LENGTH }, (_, index) => code[index] ?? '');
 
-      <div className="rounded-2xl border border-border-soft bg-white p-4 sm:p-6 space-y-4">
+  return (
+    <div className="min-h-[calc(100vh-14rem)] flex items-center justify-center">
+      <div className="w-full max-w-3xl space-y-6">
+        <header className="space-y-1 text-center">
+          <h1 className="text-2xl font-semibold text-foreground">Verify</h1>
+          <p className="text-sm text-slate-600">
+            Capture face, enter 6-digit code, and reveal the matched account email.
+          </p>
+        </header>
+
+        <div className="rounded-2xl border border-border-soft bg-white p-4 sm:p-6 space-y-4">
         <div className="rounded-xl border border-border-soft bg-slate-50 overflow-hidden aspect-video flex items-center justify-center">
           {previewUrl ? (
             // eslint-disable-next-line @next/next/no-img-element
@@ -180,12 +184,42 @@ export default function VerifyPage() {
         <label className="block">
           <span className="text-sm font-semibold text-slate-700">6-digit code</span>
           <input
+            ref={codeInputRef}
             value={code}
             onChange={(event) => setCode(event.target.value.replace(/\D/g, '').slice(0, CODE_LENGTH))}
             inputMode="numeric"
             maxLength={CODE_LENGTH}
             placeholder="000000"
-            className="mt-2 w-full rounded-xl border border-border-soft px-3 py-2.5 outline-none focus:ring-2 focus:ring-brand/30"
+            className="sr-only"
+          />
+          <button
+            type="button"
+            onClick={() => codeInputRef.current?.focus()}
+            className="mt-2 w-full"
+          >
+            <span className="sr-only">Focus 6 digit code input</span>
+            <span className="flex justify-between gap-2 sm:gap-3">
+              {codeDigits.map((digit, index) => (
+                <span
+                  key={index}
+                  className="flex-1 min-h-14 sm:min-h-16 rounded-2xl border-2 border-primary-200 bg-primary-50 text-navy-darkest text-2xl sm:text-3xl font-bold flex items-center justify-center tabular-nums"
+                >
+                  {digit || '·'}
+                </span>
+              ))}
+            </span>
+          </button>
+        </label>
+
+        <label className="block">
+          <span className="sr-only">6-digit code fallback input</span>
+          <input
+            value={code}
+            onChange={(event) => setCode(event.target.value.replace(/\D/g, '').slice(0, CODE_LENGTH))}
+            inputMode="numeric"
+            maxLength={CODE_LENGTH}
+            placeholder="000000"
+            className="mt-2 w-full rounded-xl border border-border-soft px-3 py-2.5 outline-none focus:ring-2 focus:ring-brand/30 sm:hidden"
           />
         </label>
 
@@ -231,8 +265,9 @@ export default function VerifyPage() {
             ) : null}
           </div>
         ) : null}
+        </div>
+        <canvas ref={canvasRef} className="hidden" />
       </div>
-      <canvas ref={canvasRef} className="hidden" />
     </div>
   );
 }
