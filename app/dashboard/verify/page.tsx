@@ -2,13 +2,15 @@
 
 import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { Camera, Loader2 } from 'lucide-react';
+import { useRouter } from 'next/navigation';
 import { useUploaderAuth } from '@/context/UploaderAuthContext';
-import { verifyFaceByCode, type VerifyFaceMatch } from '@/lib/api/face-verify';
+import { verifyFaceByCode } from '@/lib/api/face-verify';
 import { getErrorMessage } from '@/lib/api/errors';
 
 const CODE_LENGTH = 6;
 
 export default function VerifyPage() {
+  const router = useRouter();
   const videoRef = useRef<HTMLVideoElement | null>(null);
   const canvasRef = useRef<HTMLCanvasElement | null>(null);
   const codeInputRef = useRef<HTMLInputElement | null>(null);
@@ -21,7 +23,7 @@ export default function VerifyPage() {
   const [previewUrl, setPreviewUrl] = useState<string | null>(null);
   const [code, setCode] = useState('');
   const [submitting, setSubmitting] = useState(false);
-  const [match, setMatch] = useState<VerifyFaceMatch | null>(null);
+  const [navigatingToDashboard, setNavigatingToDashboard] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const { apiClient } = useUploaderAuth();
 
@@ -108,7 +110,6 @@ export default function VerifyPage() {
 
   const resetCapture = useCallback(() => {
     setCapturedFile(null);
-    setMatch(null);
     setError(null);
     if (previewUrl) {
       URL.revokeObjectURL(previewUrl);
@@ -121,7 +122,6 @@ export default function VerifyPage() {
   const clearAll = useCallback(() => {
     stopCamera();
     setCode('');
-    setMatch(null);
     setError(null);
     setCapturedFile(null);
     if (previewUrl) {
@@ -136,20 +136,20 @@ export default function VerifyPage() {
     if (!capturedFile) return;
     setSubmitting(true);
     setError(null);
-    setMatch(null);
     try {
       const result = await verifyFaceByCode(apiClient, { secret: code, image: capturedFile });
       if (!result.success || !result.user) {
         setError(result.message || 'No face match found for this code.');
         return;
       }
-      setMatch(result.user);
+      setNavigatingToDashboard(true);
+      router.replace(`/dashboard?matchedEmail=${encodeURIComponent(result.user.email)}`);
     } catch (err: unknown) {
       setError(getErrorMessage(err, 'Verification failed.'));
     } finally {
       setSubmitting(false);
     }
-  }, [apiClient, capturedFile, code]);
+  }, [apiClient, capturedFile, code, router]);
 
   useEffect(() => {
     void startCamera();
@@ -280,19 +280,27 @@ export default function VerifyPage() {
             </p>
           </div>
         ) : null}
-        {match ? (
-          <div className="rounded-xl border border-emerald-200 bg-emerald-50 px-4 py-4">
-            <p className="text-base sm:text-lg font-bold text-emerald-900">
-              Matched email: {match.email}
-            </p>
-            {match.similarity != null ? (
-              <p className="text-xs text-emerald-800 mt-1">Similarity: {Math.round(match.similarity)}%</p>
-            ) : null}
-          </div>
-        ) : null}
         </div>
         <canvas ref={canvasRef} className="hidden" />
       </div>
+
+      {navigatingToDashboard ? (
+        <div
+          className="fixed inset-0 z-[200] flex items-center justify-center bg-background/85 backdrop-blur-sm px-4"
+          aria-busy
+          aria-live="polite"
+        >
+          <div className="w-full max-w-sm rounded-2xl border border-border-soft bg-white px-8 py-10 shadow-xl text-center space-y-5">
+            <Loader2 className="mx-auto animate-spin text-brand" size={40} strokeWidth={2} />
+            <div className="space-y-1">
+              <p className="text-base font-bold text-foreground">Taking you to the dashboard</p>
+              <p className="text-sm text-slate-600 leading-relaxed">
+                Opening the matched user workspace…
+              </p>
+            </div>
+          </div>
+        </div>
+      ) : null}
     </div>
   );
 }
