@@ -39,3 +39,9 @@ yarn-error.log*
 # typescript
 *.tsbuildinfo
 next-env.d.ts
+.env
+
+hammertrust-34821-firebase-adminsdk-fbsvc-87bf1cba59.json
+sample_app_android/
+sample_app_ios/
+*.apk

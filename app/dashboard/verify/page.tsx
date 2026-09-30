@@ -4,7 +4,7 @@ import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { Camera, Loader2 } from 'lucide-react';
 import { useRouter } from 'next/navigation';
 import { useUploaderAuth } from '@/context/UploaderAuthContext';
-import { verifyFaceByCode } from '@/lib/api/face-verify';
+import { resolveSecretBind, verifyFaceByBind } from '@/lib/api/face-verify';
 import { getErrorMessage } from '@/lib/api/errors';
 
 const CODE_LENGTH = 6;
@@ -22,14 +22,17 @@ export default function VerifyPage() {
   const [capturedFile, setCapturedFile] = useState<File | null>(null);
   const [previewUrl, setPreviewUrl] = useState<string | null>(null);
   const [code, setCode] = useState('');
+  const [bindId, setBindId] = useState<string | null>(null);
+  const [resolvingCode, setResolvingCode] = useState(false);
   const [submitting, setSubmitting] = useState(false);
   const [navigatingToDashboard, setNavigatingToDashboard] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const { apiClient } = useUploaderAuth();
 
+  const codeAccepted = bindId !== null;
   const canSubmit = useMemo(
-    () => capturedFile !== null && code.trim().length === CODE_LENGTH && !submitting,
-    [capturedFile, code, submitting]
+    () => capturedFile !== null && bindId !== null && !submitting,
+    [capturedFile, bindId, submitting]
   );
 
   const stopCamera = useCallback(() => {
@@ -122,6 +125,7 @@ export default function VerifyPage() {
   const clearAll = useCallback(() => {
     stopCamera();
     setCode('');
+    setBindId(null);
     setError(null);
     setCapturedFile(null);
     if (previewUrl) {
@@ -129,17 +133,41 @@ export default function VerifyPage() {
       previewUrlRef.current = null;
       setPreviewUrl(null);
     }
-    void startCamera();
-  }, [previewUrl, startCamera, stopCamera]);
+  }, [previewUrl, stopCamera]);
+
+  const acceptCode = useCallback(async () => {
+    if (code.trim().length !== CODE_LENGTH) return;
+    setResolvingCode(true);
+    setError(null);
+    try {
+      const result = await resolveSecretBind(apiClient, code);
+      if (!result.success || !result.bind_id) {
+        setError(result.message || 'That code is invalid or has expired.');
+        return;
+      }
+      setBindId(result.bind_id);
+      setCapturedFile(null);
+      if (previewUrl) {
+        URL.revokeObjectURL(previewUrl);
+        previewUrlRef.current = null;
+        setPreviewUrl(null);
+      }
+      await startCamera();
+    } catch (err: unknown) {
+      setError(getErrorMessage(err, 'Could not validate that code.'));
+    } finally {
+      setResolvingCode(false);
+    }
+  }, [apiClient, code, previewUrl, startCamera]);
 
   const submit = useCallback(async () => {
-    if (!capturedFile) return;
+    if (!capturedFile || !bindId) return;
     setSubmitting(true);
     setError(null);
     try {
-      const result = await verifyFaceByCode(apiClient, { secret: code, image: capturedFile });
+      const result = await verifyFaceByBind(apiClient, { bindId, image: capturedFile });
       if (!result.success || !result.user) {
-        setError(result.message || 'No face match found for this code.');
+        setError(result.message || 'Face did not match the person for this code.');
         return;
       }
       setNavigatingToDashboard(true);
@@ -149,10 +177,9 @@ export default function VerifyPage() {
     } finally {
       setSubmitting(false);
     }
-  }, [apiClient, capturedFile, code, router]);
+  }, [apiClient, capturedFile, bindId, router]);
 
   useEffect(() => {
-    void startCamera();
     return () => {
       stopCamera();
       if (previewUrlRef.current) {
@@ -160,7 +187,7 @@ export default function VerifyPage() {
         previewUrlRef.current = null;
       }
     };
-  }, [startCamera, stopCamera]);
+  }, [stopCamera]);
 
   const codeDigits = Array.from({ length: CODE_LENGTH }, (_, index) => code[index] ?? '');
 
@@ -170,116 +197,125 @@ export default function VerifyPage() {
         <header className="space-y-1 text-center">
           <h1 className="text-2xl font-semibold text-foreground">Verify</h1>
           <p className="text-sm text-slate-600">
-            Capture face, enter 6-digit code, and reveal the matched account email.
+            Enter their 6-digit code first, then capture their face to reveal the matched email.
           </p>
         </header>
 
         <div className="rounded-2xl border border-border-soft bg-white p-4 sm:p-6 space-y-4">
-        <div className="rounded-xl border border-border-soft bg-slate-50 overflow-hidden aspect-video flex items-center justify-center">
-          {previewUrl ? (
-            // eslint-disable-next-line @next/next/no-img-element
-            <img src={previewUrl} alt="Captured face" className="w-full h-full object-cover" />
-          ) : (
-            <video ref={videoRef} className="w-full h-full object-cover" playsInline muted />
-          )}
-        </div>
-
-        <div className="flex flex-wrap gap-3">
-          {!capturedFile ? (
+          <label className="block">
+            <span className="text-sm font-semibold text-slate-700">1. 6-digit code</span>
+            <input
+              ref={codeInputRef}
+              value={code}
+              onChange={(event) => {
+                setCode(event.target.value.replace(/\D/g, '').slice(0, CODE_LENGTH));
+                setBindId(null);
+              }}
+              inputMode="numeric"
+              maxLength={CODE_LENGTH}
+              placeholder="000000"
+              className="sr-only"
+              disabled={codeAccepted}
+            />
             <button
               type="button"
-              onClick={() => void capture()}
-              disabled={!cameraReady || startingCamera}
-              className="inline-flex items-center gap-2 rounded-xl bg-brand px-4 py-2.5 text-white font-semibold disabled:opacity-60"
+              onClick={() => codeInputRef.current?.focus()}
+              className="mt-2 w-full"
+              disabled={codeAccepted}
             >
-              <Camera size={18} />
-              {startingCamera ? 'Starting camera…' : 'Capture'}
+              <span className="sr-only">Focus 6 digit code input</span>
+              <span className="flex justify-between gap-2 sm:gap-3">
+                {codeDigits.map((digit, index) => (
+                  <span
+                    key={index}
+                    className="flex-1 min-h-14 sm:min-h-16 rounded-2xl border-2 border-primary-200 bg-primary-50 text-navy-darkest text-2xl sm:text-3xl font-bold flex items-center justify-center tabular-nums"
+                  >
+                    {digit || '·'}
+                  </span>
+                ))}
+              </span>
             </button>
-          ) : (
+          </label>
+
+          {!codeAccepted ? (
             <button
               type="button"
-              onClick={resetCapture}
-              className="rounded-xl border border-border-soft px-4 py-2.5 text-sm font-semibold text-slate-700 hover:text-brand"
+              onClick={() => void acceptCode()}
+              disabled={code.trim().length !== CODE_LENGTH || resolvingCode}
+              className="w-full inline-flex items-center justify-center gap-2 rounded-2xl bg-brand px-8 py-4 text-base text-white font-bold disabled:opacity-50"
             >
-              Retake photo
+              {resolvingCode ? (
+                <>
+                  <Loader2 size={18} className="animate-spin" />
+                  Checking code…
+                </>
+              ) : (
+                'Continue to camera'
+              )}
             </button>
-          )}
-        </div>
+          ) : (
+            <>
+              <p className="text-sm text-emerald-700 font-medium">Code accepted. Capture their face next.</p>
 
-        <label className="block">
-          <span className="text-sm font-semibold text-slate-700">6-digit code</span>
-          <input
-            ref={codeInputRef}
-            value={code}
-            onChange={(event) => setCode(event.target.value.replace(/\D/g, '').slice(0, CODE_LENGTH))}
-            inputMode="numeric"
-            maxLength={CODE_LENGTH}
-            placeholder="000000"
-            className="sr-only"
-          />
+              <div className="rounded-xl border border-border-soft bg-slate-50 overflow-hidden aspect-video flex items-center justify-center">
+                {previewUrl ? (
+                  // eslint-disable-next-line @next/next/no-img-element
+                  <img src={previewUrl} alt="Captured face" className="w-full h-full object-cover" />
+                ) : (
+                  <video ref={videoRef} className="w-full h-full object-cover" playsInline muted />
+                )}
+              </div>
+
+              <div className="flex flex-wrap gap-3">
+                {!capturedFile ? (
+                  <button
+                    type="button"
+                    onClick={() => void capture()}
+                    disabled={!cameraReady || startingCamera}
+                    className="inline-flex items-center gap-2 rounded-xl bg-brand px-4 py-2.5 text-white font-semibold disabled:opacity-60"
+                  >
+                    <Camera size={18} />
+                    {startingCamera ? 'Starting camera…' : 'Capture'}
+                  </button>
+                ) : (
+                  <button
+                    type="button"
+                    onClick={resetCapture}
+                    className="rounded-xl border border-border-soft px-4 py-2.5 text-sm font-semibold text-slate-700 hover:text-brand"
+                  >
+                    Retake photo
+                  </button>
+                )}
+              </div>
+
+              <button
+                type="button"
+                onClick={() => void submit()}
+                disabled={!canSubmit}
+                className="w-full inline-flex items-center justify-center gap-2 rounded-2xl bg-brand px-8 py-4 text-base sm:text-lg text-white font-bold shadow-md hover:bg-brand-hover transition-colors disabled:opacity-50 disabled:hover:bg-brand"
+              >
+                {submitting ? (
+                  <>
+                    <Loader2 size={18} className="animate-spin" />
+                    Matching face…
+                  </>
+                ) : (
+                  'Verify face'
+                )}
+              </button>
+            </>
+          )}
+
           <button
             type="button"
-            onClick={() => codeInputRef.current?.focus()}
-            className="mt-2 w-full"
+            onClick={clearAll}
+            disabled={submitting || resolvingCode}
+            className="w-full inline-flex items-center justify-center rounded-2xl border border-border-soft bg-white px-6 py-3 text-sm sm:text-base font-semibold text-slate-700 hover:text-brand hover:border-brand/40 transition-colors disabled:opacity-60"
           >
-            <span className="sr-only">Focus 6 digit code input</span>
-            <span className="flex justify-between gap-2 sm:gap-3">
-              {codeDigits.map((digit, index) => (
-                <span
-                  key={index}
-                  className="flex-1 min-h-14 sm:min-h-16 rounded-2xl border-2 border-primary-200 bg-primary-50 text-navy-darkest text-2xl sm:text-3xl font-bold flex items-center justify-center tabular-nums"
-                >
-                  {digit || '·'}
-                </span>
-              ))}
-            </span>
+            Clear all
           </button>
-        </label>
 
-        <label className="block">
-          <span className="sr-only">6-digit code fallback input</span>
-          <input
-            value={code}
-            onChange={(event) => setCode(event.target.value.replace(/\D/g, '').slice(0, CODE_LENGTH))}
-            inputMode="numeric"
-            maxLength={CODE_LENGTH}
-            placeholder="000000"
-            className="mt-2 w-full rounded-xl border border-border-soft px-3 py-2.5 outline-none focus:ring-2 focus:ring-brand/30 sm:hidden"
-          />
-        </label>
-
-        <button
-          type="button"
-          onClick={() => void submit()}
-          disabled={!canSubmit}
-          className="w-full inline-flex items-center justify-center gap-2 rounded-2xl bg-brand px-8 py-4 text-base sm:text-lg text-white font-bold shadow-md hover:bg-brand-hover transition-colors disabled:opacity-50 disabled:hover:bg-brand"
-        >
-          {submitting ? (
-            <>
-              <Loader2 size={18} className="animate-spin" />
-              Verifying identity…
-            </>
-          ) : (
-            'Verify'
-          )}
-        </button>
-        <button
-          type="button"
-          onClick={clearAll}
-          disabled={submitting}
-          className="w-full inline-flex items-center justify-center rounded-2xl border border-border-soft bg-white px-6 py-3 text-sm sm:text-base font-semibold text-slate-700 hover:text-brand hover:border-brand/40 transition-colors disabled:opacity-60"
-        >
-          Clear all
-        </button>
-
-        {error ? <p className="text-sm text-red-600 font-medium">{error}</p> : null}
-        {submitting ? (
-          <div className="rounded-xl border border-brand/20 bg-brand/5 px-4 py-3">
-            <p className="text-sm text-brand font-medium">
-              Matching face and code securely. This usually takes a few seconds.
-            </p>
-          </div>
-        ) : null}
+          {error ? <p className="text-sm text-red-600 font-medium">{error}</p> : null}
         </div>
         <canvas ref={canvasRef} className="hidden" />
       </div>
